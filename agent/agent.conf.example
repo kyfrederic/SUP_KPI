@@ -1,0 +1,12 @@
+{
+  "central_url": "http://10.0.0.10:8080",
+  "server_name": "srv-web-01",
+  "interval_seconds": 60,
+  "state_dir": "/var/lib/sup-kpi-agent",
+  "read_from_start": false,
+  "applications": [
+    { "name": "facturation", "log_dir": "/var/log/facturation", "file_pattern": "*.log" },
+    { "name": "portail",     "log_dir": "/opt/portail/logs",    "file_pattern": ["*.log", "*.out"] },
+    { "name": "batch-nuit",  "log_dir": "/data/batch/logs",     "file_pattern": "**/*.log" }
+  ]
+}

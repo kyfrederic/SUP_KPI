@@ -1,0 +1,14 @@
+[Unit]
+Description=SUP_KPI agent (remontee des erreurs de logs)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/sup-kpi/agent/agent.py --config /etc/sup-kpi/agent.conf
+Restart=always
+RestartSec=10
+# root est utilise pour pouvoir lire tous les fichiers de log
+User=root
+
+[Install]
+WantedBy=multi-user.target

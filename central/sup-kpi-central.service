@@ -1,0 +1,13 @@
+[Unit]
+Description=SUP_KPI central (page web de supervision)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/sup-kpi/central/server.py --config /etc/sup-kpi/central.conf
+Restart=always
+RestartSec=5
+User=sup-kpi
+
+[Install]
+WantedBy=multi-user.target

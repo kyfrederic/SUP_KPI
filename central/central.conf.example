@@ -1,0 +1,11 @@
+{
+  "host": "0.0.0.0",
+  "port": 8080,
+  "db_path": "/var/lib/sup-kpi-central/sup_kpi.db",
+  "retention_days": 30,
+  "hour_warn": 1,
+  "hour_crit": 20,
+  "day_warn": 1,
+  "day_crit": 50,
+  "silent_after_seconds": 300
+}

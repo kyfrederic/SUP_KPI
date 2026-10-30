@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SUP_KPI Supervision</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true">◉</span>
+    <div>
+      <h1>SUP_KPI</h1>
+      <p class="subtitle">Supervision des erreurs de logs</p>
+    </div>
+  </div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" class="tab active" data-tab="dashboard">Tableau de bord</button>
+    <button role="tab" class="tab" data-tab="daily">Bilan de la veille</button>
+    <button role="tab" class="tab" data-tab="patterns">Patterns</button>
+  </nav>
+  <div class="refresh"><span id="refresh-dot" class="dot"></span><span id="refresh-text">Chargement…</span></div>
+</header>
+
+<main>
+  <!-- ======================= TABLEAU DE BORD ======================= -->
+  <section id="tab-dashboard" class="tab-panel">
+    <div class="filters">
+      <div class="segmented" id="period">
+        <button data-period="1h">1 heure</button>
+        <button data-period="24h" class="active">24 heures</button>
+        <button data-period="7d">7 jours</button>
+        <button data-period="30d">30 jours</button>
+      </div>
+      <label>Serveur
+        <select id="filter-server"><option value="">Tous</option></select>
+      </label>
+      <label>Application
+        <select id="filter-app"><option value="">Toutes</option></select>
+      </label>
+      <button id="filter-reset" class="link">Tout effacer</button>
+    </div>
+
+    <div class="tiles">
+      <div class="tile hero">
+        <div class="tile-label">Erreurs sur la période</div>
+        <div class="tile-value" id="kpi-total">–</div>
+        <div class="tile-sub" id="kpi-delta"></div>
+      </div>
+      <div class="tile">
+        <div class="tile-label"><span class="status-icon green">●</span> Serveurs OK</div>
+        <div class="tile-value" id="kpi-ok">–</div>
+        <div class="tile-sub">aucune erreur depuis 1 h</div>
+      </div>
+      <div class="tile">
+        <div class="tile-label"><span class="status-icon red">▲</span> Serveurs en alerte</div>
+        <div class="tile-value" id="kpi-alert">–</div>
+        <div class="tile-sub" id="kpi-alert-sub"></div>
+      </div>
+      <div class="tile">
+        <div class="tile-label"><span class="status-icon silent">○</span> Serveurs muets</div>
+        <div class="tile-value" id="kpi-silent">–</div>
+        <div class="tile-sub">robot sans nouvelles</div>
+      </div>
+      <div class="tile">
+        <div class="tile-label">Application la plus touchée</div>
+        <div class="tile-value small" id="kpi-worst">–</div>
+        <div class="tile-sub" id="kpi-worst-sub"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>État des serveurs</h2>
+        <div class="legend-status">
+          <span><span class="status-icon green">●</span> OK</span>
+          <span><span class="status-icon orange">■</span> Quelques erreurs</span>
+          <span><span class="status-icon red">▲</span> Beaucoup d'erreurs</span>
+          <span><span class="status-icon silent">○</span> Muet</span>
+          <span class="muted" id="threshold-text"></span>
+        </div>
+      </div>
+      <div class="server-grid" id="server-grid"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Évolution des erreurs</h2>
+        <span class="muted" id="chart-caption"></span>
+      </div>
+      <div class="chart" id="chart-series"></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-head"><h2>Erreurs par serveur</h2></div>
+        <div class="bars" id="bars-server"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Erreurs par application</h2></div>
+        <div class="bars" id="bars-app"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Top 10 des erreurs les plus fréquentes</h2>
+        <span class="muted">les erreurs qui se ressemblent sont regroupées</span>
+      </div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th class="num">Nombre</th><th>Message</th><th>Applications</th><th class="num">Serveurs</th><th>Dernière fois</th></tr></thead>
+          <tbody id="top-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>Dernières erreurs</h2>
+        <div class="inline-filters">
+          <select id="filter-pattern"><option value="">Tous les patterns</option></select>
+          <input id="filter-q" type="search" placeholder="Rechercher un mot…">
+        </div>
+      </div>
+      <div class="table-wrap tall">
+        <table class="table">
+          <thead><tr><th>Quand</th><th>Serveur</th><th>Application</th><th>Pattern</th><th>Ligne</th></tr></thead>
+          <tbody id="errors-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= BILAN DE LA VEILLE ======================= -->
+  <section id="tab-daily" class="tab-panel" hidden>
+    <div class="filters">
+      <label>Journée du
+        <input type="date" id="daily-date">
+      </label>
+      <button id="daily-yesterday" class="btn-secondary">Hier</button>
+      <a id="daily-csv" class="btn" href="#">Exporter pour Excel (CSV)</a>
+    </div>
+
+    <div class="tiles">
+      <div class="tile hero">
+        <div class="tile-label" id="daily-title">Erreurs de la journée</div>
+        <div class="tile-value" id="daily-total">–</div>
+        <div class="tile-sub" id="daily-delta"></div>
+      </div>
+      <div class="tile">
+        <div class="tile-label"><span class="status-icon green">●</span> Applis sans erreur</div>
+        <div class="tile-value" id="daily-green">–</div>
+      </div>
+      <div class="tile">
+        <div class="tile-label"><span class="status-icon orange">■</span> Applis avec erreurs</div>
+        <div class="tile-value" id="daily-orange">–</div>
+      </div>
+      <div class="tile">
+        <div class="tile-label"><span class="status-icon red">▲</span> Applis très touchées</div>
+        <div class="tile-value" id="daily-red">–</div>
+      </div>
+      <div class="tile">
+        <div class="tile-label"><span class="status-icon silent">○</span> Pas de nouvelles</div>
+        <div class="tile-value" id="daily-nodata">–</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>État des lieux de toutes les applications</h2>
+        <span class="muted" id="daily-thresholds"></span>
+      </div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr>
+            <th>État</th><th>Serveur</th><th>Application</th>
+            <th class="num">Erreurs</th><th class="num">La veille</th><th class="num">Évolution</th>
+            <th>1<sup>re</sup> erreur</th><th>Dernière</th><th>Erreur la plus fréquente</th>
+          </tr></thead>
+          <tbody id="daily-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= PATTERNS ======================= -->
+  <section id="tab-patterns" class="tab-panel" hidden>
+    <div class="card">
+      <div class="card-head"><h2>Ajouter un mot à chercher</h2></div>
+      <p class="help">Tape un mot (par exemple <code>Timeout</code>). Toutes les lignes de log qui le contiennent
+        seront remontées. Les majuscules et minuscules ne comptent pas. Les robots reçoivent la nouvelle liste
+        tout seuls en moins d'une minute.</p>
+      <form id="pattern-form" class="pattern-form">
+        <input id="pattern-text" type="text" placeholder="ex : Timeout, Connection refused, KO…" required>
+        <label class="check"><input id="pattern-regex" type="checkbox"> Expression régulière (pour experts)</label>
+        <button type="submit" class="btn">Ajouter</button>
+      </form>
+      <p id="pattern-msg" class="msg" role="status"></p>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Mots recherchés</h2></div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Pattern</th><th>Type</th><th>Actif</th><th></th></tr></thead>
+          <tbody id="patterns-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="tooltip" class="tooltip" hidden></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
