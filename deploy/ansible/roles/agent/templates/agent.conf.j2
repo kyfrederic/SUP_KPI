@@ -1,0 +1,8 @@
+{{ {
+  "central_url": sup_kpi_central_url | trim,
+  "server_name": sup_kpi_server_name | default(inventory_hostname),
+  "interval_seconds": sup_kpi_agent_interval | int,
+  "state_dir": sup_kpi_root ~ "/state",
+  "read_from_start": sup_kpi_read_from_start | bool,
+  "applications": sup_kpi_applications
+} | to_nice_json }}

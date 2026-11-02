@@ -45,7 +45,13 @@ No build step and no linter configured. `scripts/demo.sh` writes into `.demo/` (
 
 **Web UI (`central/static/`)**: one page, three tabs (`dashboard`, `daily`, `patterns`), vanilla JS IIFE with a single `state` object; auto-refresh every 30 s. Colours are CSS custom properties on `:root` with dark-mode overrides; status is always shown as icon + label, not colour alone.
 
-**Deployment**: `central/install_central.sh` and `agent/install_agent.sh` install to `/opt/sup-kpi`, configs in `/etc/sup-kpi/`, state in `/var/lib/sup-kpi-*`, run as systemd units (`sup-kpi-central`, `sup-kpi-agent`; the agent runs as root to read all logs).
+**Deployment (primary): GitLab CI + Ansible, no root.** `.gitlab-ci.yml` runs tests (Python 3.7 and 3.12) and `ansible:lint`, then exposes manual jobs `deploy:horsprod` / `deploy:prod` (prod only on the default branch) and `rollback:*`. Everything runs as user `webadmin` (home `/usr/local/web`) with **systemd --user** units; requires `loginctl enable-linger webadmin` once per server (checked by the `common` role).
+- `deploy/ansible/site.yml` runs on `central:agents`; `sup_kpi_services` (derived from group membership) decides which of the roles `central` / `agent` apply. Roles: `common` (checks + dirs; `checks.yml` is reused by `rollback.yml`), `central`, `agent`, `activate` (switches `current` symlink, owns all handlers, health checks, prunes old releases).
+- Layout on hosts: `~/sup-kpi/releases/<CI_COMMIT_SHORT_SHA>/`, `current` symlink, `conf/` (templated from inventory vars), `data/` (central DB, survives releases), `state/` (agent).
+- All shared defaults live in `roles/common/defaults/main.yml`; per-env overrides in `inventories/<env>/group_vars/all.yml`, per-host apps in `host_vars/<host>.yml` (`sup_kpi_applications`).
+- **Pinned to ansible-core 2.17** because it is the last release supporting Python 3.7 on managed hosts. Use only `ansible.builtin` modules (no Galaxy collections). `ansible-lint` (profile `production`) must pass: `cd deploy/ansible && ANSIBLE_CONFIG=$PWD/ansible.cfg ansible-lint`.
+
+**Deployment (manual, root):** `central/install_central.sh` and `agent/install_agent.sh` install to `/opt/sup-kpi` with system-wide systemd units.
 
 ## Tests
 

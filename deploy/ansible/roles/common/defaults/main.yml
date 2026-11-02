@@ -1,0 +1,31 @@
+---
+# Valeurs par defaut, communes a tous les environnements.
+# Pour changer une valeur pour un environnement : inventories/<env>/group_vars/all.yml
+
+# Utilisateur et dossiers (pas d'acces root)
+sup_kpi_home: /usr/local/web
+sup_kpi_root: "{{ sup_kpi_home }}/sup-kpi"
+sup_kpi_python: /usr/bin/python3
+sup_kpi_python_min: "3.7"
+
+# Version deployee (le pipeline GitLab passe le numero de commit)
+sup_kpi_version: dev
+sup_kpi_keep_releases: 3
+
+# Central
+sup_kpi_central_port: 8080
+sup_kpi_retention_days: 30
+sup_kpi_hour_warn: 1
+sup_kpi_hour_crit: 20
+sup_kpi_day_warn: 1
+sup_kpi_day_crit: 50
+sup_kpi_silent_after_seconds: 300
+
+# Agents
+sup_kpi_agent_interval: 60
+sup_kpi_read_from_start: false
+# Adresse du central vue par les agents. Par defaut : le serveur du groupe "central" de l'environnement.
+sup_kpi_central_url: >-
+  http://{{ hostvars[groups['central'][0]]['ansible_host'] | default(groups['central'][0]) }}:{{ sup_kpi_central_port }}
+# Applications a surveiller sur ce serveur : a definir dans host_vars/<serveur>.yml
+sup_kpi_applications: []

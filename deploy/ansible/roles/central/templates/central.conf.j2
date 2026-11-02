@@ -1,0 +1,11 @@
+{{ {
+  "host": "0.0.0.0",
+  "port": sup_kpi_central_port | int,
+  "db_path": sup_kpi_root ~ "/data/sup_kpi.db",
+  "retention_days": sup_kpi_retention_days | int,
+  "hour_warn": sup_kpi_hour_warn | int,
+  "hour_crit": sup_kpi_hour_crit | int,
+  "day_warn": sup_kpi_day_warn | int,
+  "day_crit": sup_kpi_day_crit | int,
+  "silent_after_seconds": sup_kpi_silent_after_seconds | int
+} | to_nice_json }}

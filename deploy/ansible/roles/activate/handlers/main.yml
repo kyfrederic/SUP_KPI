@@ -1,0 +1,22 @@
+---
+# Les handlers s'executent dans cet ordre : d'abord recharger systemd, puis redemarrer.
+- name: Recharger systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+    scope: user
+
+- name: Redemarrer le central
+  ansible.builtin.systemd_service:
+    name: sup-kpi-central
+    scope: user
+    enabled: true
+    state: restarted
+  when: "'sup-kpi-central' in sup_kpi_services"
+
+- name: Redemarrer l'agent
+  ansible.builtin.systemd_service:
+    name: sup-kpi-agent
+    scope: user
+    enabled: true
+    state: restarted
+  when: "'sup-kpi-agent' in sup_kpi_services"

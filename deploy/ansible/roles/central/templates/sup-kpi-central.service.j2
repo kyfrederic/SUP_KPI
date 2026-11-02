@@ -1,0 +1,12 @@
+# {{ ansible_managed }}
+[Unit]
+Description=SUP_KPI central ({{ sup_kpi_env }}) - page web de supervision
+
+[Service]
+ExecStart={{ sup_kpi_python }} {{ sup_kpi_root }}/current/central/server.py --config {{ sup_kpi_root }}/conf/central.conf
+Environment=PYTHONDONTWRITEBYTECODE=1
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

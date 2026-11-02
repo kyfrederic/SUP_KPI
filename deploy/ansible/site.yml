@@ -1,0 +1,30 @@
+---
+# Deploie SUP_KPI sur un environnement.
+#   ansible-playbook -i inventories/horsprod site.yml -e sup_kpi_version=<version>
+# Tout est fait avec l'utilisateur webadmin, sans root.
+- name: Deployer SUP_KPI
+  hosts: central:agents
+  any_errors_fatal: true
+  vars:
+    # Services a installer sur ce serveur, selon ses groupes dans l'inventaire
+    sup_kpi_services: >-
+      {{ (['sup-kpi-central'] if inventory_hostname in groups['central'] else [])
+         + (['sup-kpi-agent'] if inventory_hostname in groups['agents'] else []) }}
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts.user_uid | default('') }}"
+    DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ ansible_facts.user_uid | default('') }}/bus"
+  pre_tasks:
+    - name: Verifier l'inventaire (un seul central par environnement)
+      ansible.builtin.assert:
+        that:
+          - groups['central'] | default([]) | length == 1
+        fail_msg: "L'inventaire doit contenir exactement 1 serveur dans le groupe 'central'."
+        quiet: true
+      run_once: true
+  roles:
+    - role: common
+    - role: central
+      when: "'sup-kpi-central' in sup_kpi_services"
+    - role: agent
+      when: "'sup-kpi-agent' in sup_kpi_services"
+    - role: activate

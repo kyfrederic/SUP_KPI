@@ -1,0 +1,130 @@
+# Pipeline SUP_KPI : tests -> verifications Ansible -> deploiements (boutons manuels).
+#
+# Variables a creer dans GitLab (Settings > CI/CD > Variables) :
+#   SSH_PRIVATE_KEY  type "File", protegee : cle privee SSH de webadmin
+#   SSH_KNOWN_HOSTS  type "Variable"       : empreintes des serveurs (sortie de ssh-keyscan)
+
+stages:
+  - test
+  - lint
+  - deploy
+
+variables:
+  # ansible-core 2.17 est la derniere version qui gere Python 3.7 sur les serveurs
+  ANSIBLE_CORE_VERSION: "2.17.14"
+  ANSIBLE_LINT_VERSION: "26.6.0"
+  ANSIBLE_DIR: "$CI_PROJECT_DIR/deploy/ansible"
+  # Obligatoire : Ansible ignore ansible.cfg dans un dossier accessible en ecriture a tous
+  ANSIBLE_CONFIG: "$CI_PROJECT_DIR/deploy/ansible/ansible.cfg"
+  ANSIBLE_FORCE_COLOR: "1"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+default:
+  interruptible: true
+
+# ----------------------------------------------------------------- tests
+
+.tests:
+  stage: test
+  script:
+    - python3 -m unittest discover -v tests
+
+tests:py3.7:
+  extends: .tests
+  image: python:3.7-slim
+
+tests:py3.12:
+  extends: .tests
+  image: python:3.12-slim
+
+# ----------------------------------------------------------------- ansible
+
+.ansible:
+  image: python:3.12-slim
+  cache:
+    key: pip-ansible-$ANSIBLE_CORE_VERSION
+    paths:
+      - .cache/pip
+  before_script:
+    - pip install --quiet "ansible-core==$ANSIBLE_CORE_VERSION"
+    - cd "$ANSIBLE_DIR"
+
+ansible:lint:
+  extends: .ansible
+  stage: lint
+  script:
+    - pip install --quiet "ansible-lint==$ANSIBLE_LINT_VERSION"
+    - |
+      for env in horsprod prod; do
+        for playbook in site.yml rollback.yml; do
+          ansible-playbook -i "inventories/$env" "$playbook" --syntax-check
+        done
+      done
+    - ansible-lint
+
+.deploy:
+  extends: .ansible
+  stage: deploy
+  interruptible: false
+  # Bouton manuel non obligatoire : le pipeline reste vert tant qu'on ne deploie pas
+  allow_failure: true
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends openssh-client > /dev/null
+    - pip install --quiet "ansible-core==$ANSIBLE_CORE_VERSION"
+    - |
+      if [ -z "$SSH_PRIVATE_KEY" ] || [ -z "$SSH_KNOWN_HOSTS" ]; then
+        echo "Variables SSH_PRIVATE_KEY et/ou SSH_KNOWN_HOSTS manquantes (Settings > CI/CD > Variables)."
+        exit 1
+      fi
+    - eval "$(ssh-agent -s)"
+    - chmod 600 "$SSH_PRIVATE_KEY" && ssh-add "$SSH_PRIVATE_KEY"
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    - printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+    - cd "$ANSIBLE_DIR"
+
+# Hors-prod : bouton manuel, depuis n'importe quelle branche
+deploy:horsprod:
+  extends: .deploy
+  resource_group: horsprod
+  environment:
+    name: horsprod
+  script:
+    - ansible-playbook -i inventories/horsprod site.yml -e "sup_kpi_version=$CI_COMMIT_SHORT_SHA"
+  rules:
+    - when: manual
+
+rollback:horsprod:
+  extends: .deploy
+  resource_group: horsprod
+  environment:
+    name: horsprod
+    action: access
+  script:
+    - ansible-playbook -i inventories/horsprod rollback.yml
+  rules:
+    - when: manual
+
+# Prod : bouton manuel, uniquement depuis la branche principale
+deploy:prod:
+  extends: .deploy
+  resource_group: prod
+  environment:
+    name: prod
+  script:
+    - ansible-playbook -i inventories/prod site.yml -e "sup_kpi_version=$CI_COMMIT_SHORT_SHA"
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+
+rollback:prod:
+  extends: .deploy
+  resource_group: prod
+  environment:
+    name: prod
+    action: access
+  script:
+    - ansible-playbook -i inventories/prod rollback.yml
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual

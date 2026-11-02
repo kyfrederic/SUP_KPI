@@ -5,3 +5,4 @@ __pycache__/
 *.db-shm
 central/central.conf
 .demo/
+.cache/

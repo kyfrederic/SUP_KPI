@@ -1,0 +1,14 @@
+---
+# >>> A MODIFIER <<<
+ansible_host: 10.20.0.11
+# Nom affiche sur la page web (par defaut : le nom du serveur dans l'inventaire)
+# sup_kpi_server_name: srv-prd-app01
+
+# Applications a surveiller sur ce serveur
+sup_kpi_applications:
+  - name: facturation
+    log_dir: /usr/local/web/facturation/logs
+    file_pattern: "*.log"
+  - name: portail
+    log_dir: /usr/local/web/portail/logs
+    file_pattern: ["*.log", "*.out"]

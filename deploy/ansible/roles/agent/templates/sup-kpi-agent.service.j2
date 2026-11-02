@@ -1,0 +1,12 @@
+# {{ ansible_managed }}
+[Unit]
+Description=SUP_KPI agent ({{ sup_kpi_env }}) - remontee des erreurs de logs
+
+[Service]
+ExecStart={{ sup_kpi_python }} {{ sup_kpi_root }}/current/agent/agent.py --config {{ sup_kpi_root }}/conf/agent.conf
+Environment=PYTHONDONTWRITEBYTECODE=1
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

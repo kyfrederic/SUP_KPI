@@ -1,0 +1,50 @@
+---
+- name: Verifier que les applications a surveiller sont declarees
+  ansible.builtin.assert:
+    that:
+      - sup_kpi_applications | length > 0
+    fail_msg: >-
+      Aucune application declaree pour {{ inventory_hostname }}.
+      Ajoute la liste "sup_kpi_applications" dans inventories/{{ sup_kpi_env }}/host_vars/{{ inventory_hostname }}.yml
+    quiet: true
+
+- name: Verifier les dossiers de logs
+  ansible.builtin.stat:
+    path: "{{ item.log_dir }}"
+  loop: "{{ sup_kpi_applications }}"
+  loop_control:
+    label: "{{ item.name }} -> {{ item.log_dir }}"
+  register: sup_kpi_log_dirs
+
+- name: Signaler les dossiers de logs absents ou illisibles
+  ansible.builtin.debug:
+    msg: >-
+      ATTENTION : le dossier {{ item.item.log_dir }} de l'application {{ item.item.name }}
+      est introuvable ou illisible pour {{ ansible_facts.user_id }}. Le robot ne pourra pas le lire.
+  loop: "{{ sup_kpi_log_dirs.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: not (item.stat.exists and item.stat.isdir and item.stat.readable and item.stat.executable)
+
+- name: Copier le code de l'agent
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../agent/agent.py"
+    dest: "{{ sup_kpi_root }}/releases/{{ sup_kpi_version }}/agent/"
+    mode: "0750"
+  notify: Redemarrer l'agent
+
+- name: Ecrire la configuration de l'agent
+  ansible.builtin.template:
+    src: agent.conf.j2
+    dest: "{{ sup_kpi_root }}/conf/agent.conf"
+    mode: "0640"
+  notify: Redemarrer l'agent
+
+- name: Installer le service systemd (utilisateur) de l'agent
+  ansible.builtin.template:
+    src: sup-kpi-agent.service.j2
+    dest: "{{ sup_kpi_home }}/.config/systemd/user/sup-kpi-agent.service"
+    mode: "0644"
+  notify:
+    - Recharger systemd
+    - Redemarrer l'agent

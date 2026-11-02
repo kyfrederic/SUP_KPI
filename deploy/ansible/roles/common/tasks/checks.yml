@@ -1,0 +1,33 @@
+---
+- name: Lire la version de Python 3
+  ansible.builtin.command: "{{ sup_kpi_python }} -c 'import platform; print(platform.python_version())'"
+  register: sup_kpi_python_version
+  changed_when: false
+  failed_when: false
+
+- name: Verifier que Python 3 est assez recent
+  ansible.builtin.assert:
+    that:
+      - sup_kpi_python_version.rc == 0
+      - sup_kpi_python_version.stdout is version(sup_kpi_python_min, '>=')
+    fail_msg: >-
+      {{ sup_kpi_python }} est introuvable ou trop ancien ({{ sup_kpi_python_version.stdout | default('?') }}).
+      Il faut Python {{ sup_kpi_python_min }} ou plus sur {{ inventory_hostname }}.
+    quiet: true
+
+- name: Verifier le mode "linger" de systemd pour {{ ansible_facts.user_id }}
+  ansible.builtin.command: "loginctl show-user {{ ansible_facts.user_id }} --property=Linger"
+  register: sup_kpi_linger
+  changed_when: false
+  failed_when: false
+
+- name: Exiger le mode "linger" (sinon les services s'arretent a la deconnexion)
+  ansible.builtin.assert:
+    that:
+      - sup_kpi_linger.rc == 0
+      - "'Linger=yes' in sup_kpi_linger.stdout"
+    fail_msg: >-
+      Sur {{ inventory_hostname }}, un administrateur root doit lancer UNE SEULE FOIS :
+      loginctl enable-linger {{ ansible_facts.user_id }}
+      (sinon les services de {{ ansible_facts.user_id }} ne demarrent pas tout seuls).
+    quiet: true

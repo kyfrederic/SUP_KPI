@@ -1,0 +1,11 @@
+---
+# >>> A MODIFIER <<<
+ansible_host: 10.20.0.12
+
+sup_kpi_applications:
+  - name: batch-nuit
+    log_dir: /usr/local/web/batch/logs
+    file_pattern: "**/*.log"
+  - name: api-clients
+    log_dir: /usr/local/web/api-clients/logs
+    file_pattern: "*.log"

@@ -1,0 +1,62 @@
+---
+- name: Ecrire le numero de version dans la release
+  ansible.builtin.copy:
+    content: "{{ sup_kpi_version }}\n"
+    dest: "{{ sup_kpi_root }}/releases/{{ sup_kpi_version }}/VERSION"
+    mode: "0640"
+
+- name: Activer la nouvelle version (lien "current")
+  ansible.builtin.file:
+    src: "{{ sup_kpi_root }}/releases/{{ sup_kpi_version }}"
+    dest: "{{ sup_kpi_root }}/current"
+    state: link
+    force: true
+  notify:
+    - Redemarrer le central
+    - Redemarrer l'agent
+
+- name: Appliquer tout de suite les redemarrages necessaires
+  ansible.builtin.meta: flush_handlers
+
+- name: Activer et demarrer les services
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    scope: user
+    enabled: true
+    state: started
+  loop: "{{ sup_kpi_services }}"
+
+- name: Verifier que le central repond
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ sup_kpi_central_port }}/api/health"
+    return_content: true
+  register: sup_kpi_health
+  until: sup_kpi_health.status == 200
+  retries: 15
+  delay: 2
+  when: "'sup-kpi-central' in sup_kpi_services"
+
+- name: Verifier que l'agent tourne
+  ansible.builtin.command: systemctl --user is-active sup-kpi-agent  # noqa: command-instead-of-module
+  register: sup_kpi_agent_active
+  changed_when: false
+  until: sup_kpi_agent_active.stdout == 'active'
+  retries: 5
+  delay: 3
+  when: "'sup-kpi-agent' in sup_kpi_services"
+
+- name: Lister les anciennes versions
+  ansible.builtin.find:
+    paths: "{{ sup_kpi_root }}/releases"
+    file_type: directory
+  register: sup_kpi_releases
+
+- name: Supprimer les versions trop anciennes (on garde les plus recentes)
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: >-
+    {{ (sup_kpi_releases.files | sort(attribute='mtime', reverse=true))[sup_kpi_keep_releases | int:]
+       | rejectattr('path', 'equalto', sup_kpi_root ~ '/releases/' ~ sup_kpi_version) | list }}
+  loop_control:
+    label: "{{ item.path | basename }}"

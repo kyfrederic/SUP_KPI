@@ -1,0 +1,17 @@
+---
+- name: Verifications prealables
+  ansible.builtin.import_tasks: checks.yml
+
+- name: Creer les dossiers de SUP_KPI
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0750"
+  loop:
+    - "{{ sup_kpi_root }}"
+    - "{{ sup_kpi_root }}/releases"
+    - "{{ sup_kpi_root }}/releases/{{ sup_kpi_version }}"
+    - "{{ sup_kpi_root }}/conf"
+    - "{{ sup_kpi_root }}/data"
+    - "{{ sup_kpi_root }}/state"
+    - "{{ sup_kpi_home }}/.config/systemd/user"

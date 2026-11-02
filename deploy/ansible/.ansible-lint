@@ -1,0 +1,7 @@
+---
+profile: production
+exclude_paths:
+  - .cache/
+skip_list:
+  # Les variables sup_kpi_* sont partagees volontairement entre les roles
+  - var-naming[no-role-prefix]

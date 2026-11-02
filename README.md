@@ -70,8 +70,81 @@ Puis ouvre **http://localhost:8099** dans ton navigateur. Ça crée de faux serv
 
 ---
 
-## 🏠 Installer pour de vrai
+## 🤖 Déploiement automatique avec GitLab + Ansible (méthode conseillée)
 
+Ici, **personne n'a besoin d'être root** : tout est installé et lancé avec l'utilisateur `webadmin`
+(dans `/usr/local/web/sup-kpi`). C'est GitLab qui fait le travail quand tu cliques sur un bouton.
+
+### Comment ça marche ?
+1. Tu modifies le projet et tu l'envoies sur GitLab.
+2. GitLab lance tout seul les **tests** et les **vérifications** (étapes `test` et `lint`).
+3. Si tout est vert, deux boutons ▶ apparaissent dans le pipeline :
+   - **`deploy:horsprod`** : installe sur les serveurs hors-prod (depuis n'importe quelle branche) ;
+   - **`deploy:prod`** : installe sur les serveurs de prod (seulement depuis la branche principale).
+4. En cas de souci : boutons **`rollback:horsprod`** / **`rollback:prod`**, qui reviennent à la version d'avant.
+   On garde les 3 dernières versions sur chaque serveur. La base de données n'est jamais effacée.
+
+### À faire une seule fois
+
+**a) Demander à un administrateur root**, sur chaque serveur, de lancer :
+```sh
+loginctl enable-linger webadmin
+```
+Sans ça, les programmes de webadmin ne redémarrent pas tout seuls (après un redémarrage du serveur, par exemple).
+Si c'est oublié, le déploiement s'arrête et le dit clairement.
+
+**b) Créer une clé SSH** pour que GitLab puisse se connecter en tant que webadmin :
+```sh
+ssh-keygen -t ed25519 -f sup-kpi-deploy -N "" -C "gitlab-sup-kpi"
+```
+- Le contenu de `sup-kpi-deploy.pub` va dans `/usr/local/web/.ssh/authorized_keys` sur **chaque** serveur.
+- Les empreintes des serveurs : `ssh-keyscan srv-hpr-app01 srv-hpr-app02 srv-prd-app01 ... > known_hosts`
+
+**c) Dans GitLab** → *Settings → CI/CD → Variables*, créer :
+
+| Nom | Type | Contenu |
+|---|---|---|
+| `SSH_PRIVATE_KEY` | **File** | le contenu du fichier `sup-kpi-deploy` (la clé privée) |
+| `SSH_KNOWN_HOSTS` | Variable | le contenu du fichier `known_hosts` |
+
+Si tu coches « Protected » (conseillé), ces variables ne marchent que sur les branches protégées
+(`main` par exemple) : il faut alors aussi protéger les branches d'où tu déploies le hors-prod.
+Conseil : dans *Settings → CI/CD → Protected environments*, protège `prod` pour choisir qui a le droit de cliquer.
+
+**d) Décrire tes serveurs** dans `deploy/ansible/inventories/` (un dossier `horsprod`, un dossier `prod`) :
+- `hosts.yml` : la liste des serveurs. Le groupe `central` contient **le** serveur qui affiche la page web,
+  le groupe `agents` contient **tous** les serveurs à surveiller.
+- `host_vars/<nom-du-serveur>.yml` : l'adresse du serveur et ses applications :
+  ```yaml
+  ansible_host: 10.10.0.12
+  sup_kpi_applications:
+    - name: facturation
+      log_dir: /usr/local/web/facturation/logs
+      file_pattern: "*.log"
+  ```
+- `group_vars/all.yml` : les réglages de l'environnement (port, couleurs des voyants, jours d'historique).
+
+Le runner GitLab doit pouvoir joindre les serveurs en SSH (port 22), et les serveurs doivent pouvoir joindre
+le central sur le port 8080.
+
+### Où sont les choses sur un serveur ?
+```
+/usr/local/web/sup-kpi/current   → la version active (lien vers releases/<numéro de commit>)
+/usr/local/web/sup-kpi/conf/     → central.conf, agent.conf (générés par Ansible : ne pas modifier à la main)
+/usr/local/web/sup-kpi/data/     → la base de données du central
+```
+Commandes utiles (connecté en webadmin) :
+```sh
+systemctl --user status sup-kpi-agent        # le robot tourne-t-il ?
+journalctl --user -u sup-kpi-agent -f        # ce que fait le robot
+systemctl --user restart sup-kpi-central     # relancer la page web
+```
+
+---
+
+## 🏠 Installer à la main (avec un accès root)
+
+Si tu n'utilises pas GitLab et que tu as un accès root, tu peux aussi tout installer à la main.
 Copie le dossier `SUP_KPI` sur chaque serveur (par exemple avec `git clone` ou `scp`).
 
 ### Étape 1 : installer le central (une seule fois, sur le serveur choisi)

@@ -1,0 +1,64 @@
+---
+# Revient a la version precedente sur un environnement.
+#   ansible-playbook -i inventories/horsprod rollback.yml
+- name: Revenir a la version precedente de SUP_KPI
+  hosts: central:agents
+  vars:
+    sup_kpi_services: >-
+      {{ (['sup-kpi-central'] if inventory_hostname in groups['central'] else [])
+         + (['sup-kpi-agent'] if inventory_hostname in groups['agents'] else []) }}
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts.user_uid | default('') }}"
+    DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ ansible_facts.user_uid | default('') }}/bus"
+  tasks:
+    # Charge les valeurs par defaut et refait les verifications (Python, linger)
+    - name: Verifications prealables
+      ansible.builtin.import_role:
+        name: common
+        tasks_from: checks.yml
+
+    - name: Lire la version actuelle
+      ansible.builtin.stat:
+        path: "{{ sup_kpi_root }}/current"
+      register: sup_kpi_current
+
+    - name: Lister les versions disponibles
+      ansible.builtin.find:
+        paths: "{{ sup_kpi_root }}/releases"
+        file_type: directory
+      register: sup_kpi_releases
+
+    - name: Choisir la version precedente
+      vars:
+        sup_kpi_ordered: "{{ sup_kpi_releases.files | sort(attribute='mtime', reverse=true) | map(attribute='path') | list }}"
+        sup_kpi_active: "{{ sup_kpi_current.stat.lnk_source | default('') }}"
+      ansible.builtin.set_fact:
+        sup_kpi_previous: >-
+          {{ sup_kpi_ordered[sup_kpi_ordered.index(sup_kpi_active) + 1]
+             if sup_kpi_active in sup_kpi_ordered and sup_kpi_ordered.index(sup_kpi_active) + 1 < sup_kpi_ordered | length
+             else '' }}
+
+    - name: Verifier qu'il existe une version precedente
+      ansible.builtin.assert:
+        that:
+          - sup_kpi_previous | length > 0
+        fail_msg: "Pas de version precedente sur {{ inventory_hostname }} : retour arriere impossible."
+        quiet: true
+
+    - name: Repointer "current" vers la version precedente
+      ansible.builtin.file:
+        src: "{{ sup_kpi_previous }}"
+        dest: "{{ sup_kpi_root }}/current"
+        state: link
+        force: true
+
+    - name: Redemarrer les services
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        scope: user
+        state: restarted
+      loop: "{{ sup_kpi_services }}"
+
+    - name: Afficher la version active
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }} est revenu a la version {{ sup_kpi_previous | basename }}"

@@ -1,0 +1,13 @@
+---
+# Reglages de l'environnement horsprod (les autres valeurs par defaut sont dans roles/common/defaults/main.yml)
+sup_kpi_env: horsprod
+sup_kpi_central_port: 8080
+
+# Couleurs des voyants (nombre d'erreurs)
+sup_kpi_hour_warn: 1
+sup_kpi_hour_crit: 20
+sup_kpi_day_warn: 1
+sup_kpi_day_crit: 50
+
+# Nombre de jours d'historique gardes par le central
+sup_kpi_retention_days: 30

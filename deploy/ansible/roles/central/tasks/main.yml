@@ -1,0 +1,23 @@
+---
+- name: Copier le code du central
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../central/"
+    dest: "{{ sup_kpi_root }}/releases/{{ sup_kpi_version }}/central/"
+    mode: preserve
+  notify: Redemarrer le central
+
+- name: Ecrire la configuration du central
+  ansible.builtin.template:
+    src: central.conf.j2
+    dest: "{{ sup_kpi_root }}/conf/central.conf"
+    mode: "0640"
+  notify: Redemarrer le central
+
+- name: Installer le service systemd (utilisateur) du central
+  ansible.builtin.template:
+    src: sup-kpi-central.service.j2
+    dest: "{{ sup_kpi_home }}/.config/systemd/user/sup-kpi-central.service"
+    mode: "0644"
+  notify:
+    - Recharger systemd
+    - Redemarrer le central
